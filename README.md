@@ -894,13 +894,23 @@ banking-risk-analytics/
 │
 ├── Banking.csv
 ├── README.md
-├── LICENSE
+├── LICENSE                          # MIT — original copyright notice retained
+├── requirements.txt                 # added — notebook dependencies
 │
 ├── sql/
 │   └── Banking_Complete_SQL_analysis.sql
 │
 ├── python/
-│   └── banking_eda.ipynb.ipynb
+│   ├── banking_eda.ipynb            # renamed from banking_eda.ipynb.ipynb
+│   └── data_quality.py              # added — dataset validator
+│
+├── docs/
+│   └── data_quality_findings.md     # added — validation write-up
+│
+├── tests/                           # added — standard-library test suite
+│   ├── test_data_quality.py
+│   ├── test_kpis.py
+│   └── test_notebook.py
 │
 ├── powerbi/
 │   └── Banking Analysis Dashboard Shabab new.pbix
@@ -925,6 +935,22 @@ banking-risk-analytics/
 
 # ▶️ How to Run
 
+## Verify the data first — no dependencies
+
+The validation and test layers use only the Python standard library, so they
+run with no install step at all:
+
+```bash
+python3 python/data_quality.py                 # dataset contract; non-zero exit on CRITICAL
+python3 -m unittest discover -s tests -v       # 39 tests
+```
+
+`data_quality.py` is **expected to fail** on the shipped data — that failure is
+the finding described in [Data Quality Checks](#data-quality-checks) and
+[`docs/data_quality_findings.md`](docs/data_quality_findings.md).
+
+---
+
 ## MySQL
 
 Run:
@@ -937,23 +963,35 @@ The script creates the project database and banking table.
 
 The CSV import section contains a `LOAD DATA INFILE` template that may need to be updated for the local MySQL secure-file path.
 
+> **Not verified (my adaptation).** No MySQL client or server was available in
+> the environment where this repository was prepared, so **this SQL was never
+> executed**. The KPI figures it produces were instead verified by independent
+> recomputation from the CSV in `tests/test_kpis.py`. Treat the script as
+> reviewed and corrected, not as run.
+
 ---
 
-## Python
+## Python notebook
 
-Open:
-
-```text
-python/banking_eda.ipynb.ipynb
-```
-
-The notebook performs exploratory analysis of the banking data.
-
-Required libraries include:
+Install dependencies:
 
 ```bash
-pip install pandas numpy matplotlib seaborn
+pip install -r requirements.txt
 ```
+
+Then launch it **from the repository root**, so the relative data path resolves:
+
+```bash
+jupyter notebook python/banking_eda.ipynb
+```
+
+> **Fixed (my adaptation).** This notebook originally opened with
+> `pd.read_excel('/content/Banking01.xlsx')` — a Google Colab absolute path to a
+> file that is not part of this repository — so it could not run from a fresh
+> clone at all. It now reads the shipped `Banking.csv` via a path resolved
+> relative to the working directory, using `utf-8-sig` to strip the file's BOM.
+> The stored cell outputs are the original author's and were **not** regenerated;
+> they are retained as evidence of his analysis.
 
 ---
 

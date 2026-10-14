@@ -1,0 +1,10 @@
+# Dependencies for the Python EDA notebook (python/banking_eda.ipynb).
+# Install with:  pip install -r requirements.txt
+#
+# Note: python/data_quality.py and the tests/ suite deliberately use only the
+# Python standard library, so data validation and testing need no install step.
+
+pandas>=2.0
+numpy>=1.24
+matplotlib>=3.7
+seaborn>=0.12
