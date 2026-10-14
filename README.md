@@ -45,6 +45,8 @@ run against the data, and running them surfaces a real defect.
 | `tests/` | **New.** Regression tests, standard library only | Pin the defect and the KPI reconciliation so they cannot silently regress |
 | `python/banking_eda.ipynb` | Loads `Banking.csv` by relative path; was `pd.read_excel('/content/Banking01.xlsx')` | The notebook could not run from the repository at all — that file does not exist here and `/content/` is a Colab-only path |
 | `requirements.txt`, run instructions | **New** / corrected | No installation path was documented that actually worked |
+| `analysis/credit_risk_kpi.py` | **New.** A ranked Credit Risk Concentration Score with a documented formula, plus segment-level risk / growth / profitability cuts | The inherited screening rules flag clients but cannot rank or combine them, so they cannot prioritise a review queue |
+| `tests/test_credit_risk_kpi.py` | **New.** Tests for that index | Bounds, monotonicity, determinism, and the assumptions its docstring claims about the data |
 
 **Deliberately unchanged:** the analysis itself, its methodology, its KPI
 definitions and all of its published figures. The 3,000 source rows are
@@ -887,6 +889,88 @@ The project provides a way to identify where portfolio balances are concentrated
 
 ---
 
+# 🧪 Credit Risk Concentration Score — *added*
+
+> **This section is my work, not the original author's.** The inherited analysis
+> deliberately stops at boolean screening rules and states plainly that the
+> dataset carries no default outcomes. This index keeps that boundary — it does
+> not predict default either. It is a documented ranking, so a reviewer can see
+> *why* a client ranks highly and disagree with any component of it.
+
+The three inherited screening rules are individually useful but cannot be
+combined or ordered: a client is flagged or not, and nothing distinguishes the
+most exposed flagged client from the least. `analysis/credit_risk_kpi.py` adds a
+single ranked score.
+
+## Formula
+
+Each client is scored on three components, each converted to a percentile rank
+across the portfolio (`0` = lowest, `1` = highest):
+
+```text
+leverage  = total_exposure / max(total_deposits, 1)
+coverage  = total_exposure / max(estimated_income, 1)
+risk_tier = risk_weighting (1–5, as supplied by the dataset)
+
+CRCS = 100 × (0.40·rank(leverage) + 0.40·rank(coverage) + 0.20·rank(risk_tier))
+```
+
+Percentile ranks are used rather than the raw ratios because the raw
+distributions are heavy-tailed — one client with near-zero deposits would
+otherwise dominate every other score.
+
+**The weights are assumptions, not calibrated parameters** — the same status as
+the inherited 5% / 3% / 1% fee rates. They are exposed as `WEIGHTS` in the module
+so a reviewer can change them.
+
+## ⚠️ What CRCS is not
+
+- **Not a probability of default.** The dataset contains no repayment,
+  delinquency or default field, so nothing here can be validated against reality.
+- **Its mean is 50 by construction.** Every component is a percentile rank, so
+  the portfolio mean is always ≈50 and segment means are only interpretable
+  *relative to 50*. A segment at 53.8 is not "high risk" — it ranks above the
+  portfolio average.
+- **Not calibrated.** With no outcome to calibrate against, the score orders
+  clients but does not quantify them.
+
+## Findings
+
+| Observation | Figure |
+|---|---|
+| Top decile (300 clients, 10%) holds | **16.5%** of total exposure |
+| Income band — Low / Mid / High mean CRCS | **53.8 / 48.4 / 46.7** |
+| Banking relationship — spread across all four | **49.5 – 50.3** (essentially flat) |
+| Nationality — spread across all five | **49.1 – 51.7** (essentially flat) |
+| Risk tier 1 → 5 mean CRCS | **45.3 → 55.5** (monotonic, ~10-point spread) |
+
+- **Exposure concentration is modest.** The riskiest 10% of clients hold 16.5% of
+  exposure — a flatter distribution than the headline loan-to-deposit ratio of
+  1.16 might suggest.
+- **Lower income ranks higher**, which is expected rather than discovered: the
+  coverage component divides exposure by income.
+- **Banking relationship and nationality carry almost no signal** here — under
+  2 points of spread across every category. That is a negative result, reported
+  as one rather than dressed up.
+- **The dataset's own `risk_weighting` agrees with the score, but weakly.** It is
+  monotonic across tiers 1→5, which is a genuine consistency check, but the whole
+  spread is 10 points on a 0–100 scale.
+- **Acquisition cohort carries no risk signal.** Mean CRCS sits between 46 and 54
+  for every joining year from 1995 to 2021.
+
+## Data observation
+
+`Joined Bank` years **1997 and 1998 contain no clients at all** — a two-year gap
+in the acquisition record. It is visible in the cohort table and nothing in the
+dataset explains it.
+
+```bash
+python3 analysis/credit_risk_kpi.py          # formatted report
+python3 analysis/credit_risk_kpi.py --json   # machine-readable
+```
+
+---
+
 # 📁 Repository Structure
 
 ```text
@@ -911,6 +995,9 @@ banking-risk-analytics/
 │   ├── test_data_quality.py
 │   ├── test_kpis.py
 │   └── test_notebook.py
+│
+├── analysis/
+│   └── credit_risk_kpi.py           # added — CRCS screening index
 │
 ├── powerbi/
 │   └── Banking Analysis Dashboard Shabab new.pbix
